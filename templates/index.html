@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบตรวจสอบคุณภาพชุดข้อมูล</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .quality-score {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .result-card {
+            display: none;
+            margin-top: 20px;
+        }
+        .loading {
+            display: none;
+        }
+        .nav-tabs .nav-link {
+            color: #495057;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+        }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            background: #e9ecef;
+            border-color: #0d6efd;
+        }
+        .drop-zone i {
+            font-size: 48px;
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+        .file-list {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background: white;
+        }
+        .file-item i {
+            margin-right: 10px;
+        }
+        .file-item .file-name {
+            flex-grow: 1;
+        }
+        .file-item .remove-file {
+            color: #dc3545;
+            cursor: pointer;
+        }
+        .progress {
+            display: none;
+            margin-top: 10px;
+        }
+        .prompt-suggestions {
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .prompt-suggestion {
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .prompt-suggestion:hover {
+            background-color: #f8f9fa;
+            border-color: #0d6efd;
+        }
+        
+        .prompt-suggestion.selected {
+            background-color: #e7f1ff;
+            border-color: #0d6efd;
+        }
+
+        .prompt-features {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .feature-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            background: #e9ecef;
+            border-radius: 12px;
+            font-size: 0.875rem;
+        }
+
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .drop-zone:hover {
+            background-color: #f8f9fa;
+        }
+        .drop-zone.active {
+            border-color: #4caf50;
+            background-color: #e8f5e9;
+        }
+        .file-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 6px;
+        }
+        .file-item .file-name {
+            flex-grow: 1;
+            margin-right: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .file-item .file-remove {
+            cursor: pointer;
+            color: #dc3545;
+        }
+        .source-result-loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-database me-2"></i>
+                ระบบตรวจสอบคุณภาพชุดข้อมูล
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="check-tab" data-bs-toggle="tab" data-bs-target="#check" type="button" role="tab">
+                    <i class="fas fa-search me-2"></i>ตรวจสอบข้อมูล
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="generate-tab" data-bs-toggle="tab" data-bs-target="#generate" type="button" role="tab">
+                    <i class="fas fa-magic me-2"></i>สร้างชุดข้อมูล
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="generate-from-source-tab" data-bs-toggle="tab" data-bs-target="#generate-from-source" type="button" role="tab">
+                    <i class="fas fa-file-import me-2"></i>สร้างจากไฟล์ต้นฉบับ
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="enhance-tab" data-bs-toggle="tab" data-bs-target="#enhance" type="button" role="tab">
+                    <i class="fas fa-wand-magic-sparkles me-2"></i>ปรับปรุงชุดข้อมูล
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="mainTabsContent">
+            <!-- ตรวจสอบข้อมูล -->
+            <div class="tab-pane fade show active" id="check" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card my-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">อัปโหลดชุดข้อมูล</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="uploadForm">
+                                    <div class="mb-3">
+                                        <label for="fileUpload" class="form-label">เลือกไฟล์ชุดข้อมูล</label>
+                                        <input type="file" class="form-control" id="fileUpload" name="file">
+                                    </div>
+                                    
+                                    <!-- เพิ่มส่วนรูปแบบการแสดงผล -->
+                                    <div class="mb-3">
+                                        <label for="outputFormat" class="form-label">รูปแบบผลลัพธ์</label>
+                                        <select class="form-select" id="outputFormat" name="outputFormat">
+                                            <option value="html" selected>HTML (เว็บเพจ)</option>
+                                            <option value="json">JSON</option>
+                                            <option value="csv">CSV</option>
+                                            <option value="text">Plain Text</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="enableImgAnalysis" name="enableImgAnalysis">
+                                        <label class="form-check-label" for="enableImgAnalysis">
+                                            เปิดใช้งานการวิเคราะห์ภาพ (สำหรับชุดข้อมูลภาพ)
+                                        </label>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary" id="uploadBtn">อัปโหลด</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    ผลการตรวจสอบ
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-4">
+                                    <div class="quality-score" id="qualityScore">-</div>
+                                    <div class="text-muted">คะแนนคุณภาพโดยรวม</div>
+                                </div>
+                                
+                                <div class="loading text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">กำลังโหลด...</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="result-card" id="resultCard">
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-info" id="analyzeBtn">
+                                            <i class="fas fa-search me-2"></i>
+                                            วิเคราะห์ปัญหา
+                                        </button>
+                                        <button class="btn btn-warning" id="fixBtn">
+                                            <i class="fas fa-tools me-2"></i>
+                                            แก้ไขอัตโนมัติ
+                                        </button>
+                                        <a href="#" class="btn btn-success" id="downloadBtn" target="_blank">
+                                            <i class="fas fa-download me-2"></i>
+                                            ดาวน์โหลดรายงาน
+                                        </a>
+                                        <button class="btn btn-primary" id="previewBtn">
+                                            <i class="fas fa-eye me-2"></i>
+                                            แสดงตัวอย่างรายงาน
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- สร้างชุดข้อมูล -->
+            <div class="tab-pane fade" id="generate" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card my-4">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">สร้างชุดข้อมูล</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="generateForm">
+                                    <div class="mb-3">
+                                        <label for="prompt" class="form-label">คำสั่ง</label>
+                                        <textarea class="form-control" id="prompt" name="prompt" rows="3" placeholder="ระบุรายละเอียดชุดข้อมูลที่ต้องการสร้าง..."></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="numSamples" class="form-label">จำนวนตัวอย่าง</label>
+                                        <input type="number" class="form-control" id="numSamples" name="numSamples" min="1" max="1000" value="10">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="taskType" class="form-label">ประเภทงาน</label>
+                                        <select class="form-select" id="taskType" name="taskType">
+                                            <option value="">ทั่วไป</option>
+                                            <option value="text_classification">การจำแนกข้อความ</option>
+                                            <option value="named_entity_recognition">การจดจำชื่อเฉพาะ</option>
+                                            <option value="question_answering">ถาม-ตอบ</option>
+                                            <option value="text_summarization">สรุปความ</option>
+                                            <option value="image_classification">จำแนกรูปภาพ</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- เพิ่มตัวเลือกรูปแบบไฟล์ผลลัพธ์ -->
+                                    <div class="mb-3">
+                                        <label for="datasetOutputFormat" class="form-label">รูปแบบไฟล์ผลลัพธ์</label>
+                                        <select class="form-select" id="datasetOutputFormat" name="outputFormat">
+                                            <option value="json" selected>JSON</option>
+                                            <option value="csv">CSV</option>
+                                            <option value="parquet">Parquet</option>
+                                            <option value="arrow">Arrow</option>
+                                            <option value="txt">TXT</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- เพิ่มตัวเลือกรูปแบบรายงาน -->
+                                    <div class="mb-3">
+                                        <label for="reportFormat" class="form-label">รูปแบบรายงาน</label>
+                                        <select class="form-select" id="reportFormat" name="reportFormat">
+                                            <option value="html" selected>HTML</option>
+                                            <option value="json">JSON</option>
+                                            <option value="csv">CSV</option>
+                                            <option value="pdf">PDF</option>
+                                        </select>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-success" id="generateBtn">สร้าง</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    ผลการสร้าง
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-4">
+                                    <div class="quality-score" id="generateQualityScore">-</div>
+                                    <div class="text-muted">คะแนนคุณภาพโดยรวม</div>
+                                </div>
+                                
+                                <div class="loading text-center" id="generateLoading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">กำลังสร้าง...</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="result-card" id="generateResultCard">
+                                    <div class="d-grid gap-2">
+                                        <a href="#" class="btn btn-success" id="downloadGeneratedBtn" target="_blank">
+                                            <i class="fas fa-download me-2"></i>
+                                            ดาวน์โหลดชุดข้อมูล
+                                        </a>
+                                        <a href="#" class="btn btn-info" id="downloadGeneratedReportBtn" target="_blank">
+                                            <i class="fas fa-file-alt me-2"></i>
+                                            ดาวน์โหลดรายงาน
+                                        </a>
+                                        <button class="btn btn-primary" id="previewGeneratedBtn">
+                                            <i class="fas fa-eye me-2"></i>
+                                            แสดงตัวอย่างรายงาน
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- สร้างจากไฟล์ต้นฉบับ (แยกออกเป็น Tab ใหม่) -->
+            <div class="tab-pane fade" id="generate-from-source" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card my-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">สร้างข้อมูลจากไฟล์ต้นฉบับ</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <p class="text-muted">
+                                        อัปโหลดไฟล์ต้นฉบับเพื่อใช้ในการสร้างชุดข้อมูลที่มีคุณภาพโดยไม่บิดเบือนเนื้อหา
+                                        ระบบจะเรียบเรียงและเสริมแต่งข้อมูลให้ครบถ้วนสมบูรณ์ตามข้อมูลต้นฉบับ
+                                    </p>
+                                </div>
+
+                                <div class="drop-zone mb-3" id="sourceDropZone">
+                                    <input type="file" id="sourceFileInput" multiple style="display: none;">
+                                    <div class="drop-zone-content">
+                                        <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
+                                        <p class="mb-1">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</p>
+                                        <p class="text-muted small">รองรับไฟล์ CSV, JSON, TXT, PDF, DOCX และไฟล์อื่นๆ</p>
+                                    </div>
+                                </div>
+
+                                <div class="file-list mb-3" id="sourceFileList">
+                                    <!-- รายการไฟล์จะถูกแสดงที่นี่ -->
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="sourceTaskType" class="form-label">ประเภทงาน</label>
+                                    <select class="form-select" id="sourceTaskType">
+                                        <option value="">ทั่วไป</option>
+                                        <option value="data_enrichment">เพิ่มรายละเอียดข้อมูล</option>
+                                        <option value="data_completion">เติมเต็มข้อมูลที่ขาด</option>
+                                        <option value="fact_based_generation">สร้างเนื้อหาตามข้อเท็จจริง</option>
+                                        <option value="data_restructuring">ปรับโครงสร้างข้อมูล</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="sourcePrompt" class="form-label">คำแนะนำเพิ่มเติม (ไม่จำเป็น)</label>
+                                    <textarea class="form-control" id="sourcePrompt" rows="3" placeholder="ระบุคำแนะนำเพิ่มเติมเกี่ยวกับการสร้างข้อมูล เช่น รูปแบบ ความละเอียด หรือเงื่อนไขอื่นๆ..."></textarea>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="sourceOutputFormat" class="form-label">รูปแบบไฟล์ผลลัพธ์</label>
+                                    <select class="form-select" id="sourceOutputFormat">
+                                        <option value="json" selected>JSON</option>
+                                        <option value="csv">CSV</option>
+                                        <option value="parquet">Parquet</option>
+                                        <option value="arrow">Arrow</option>
+                                        <option value="txt">TXT</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="sourceStrictFactual" checked>
+                                    <label class="form-check-label" for="sourceStrictFactual">
+                                        ยึดตามข้อเท็จจริงจากไฟล์เท่านั้น (ไม่เพิ่มข้อมูลที่ไม่มีในไฟล์ต้นฉบับ)
+                                    </label>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="sourceQualityLevel" class="form-label">ระดับคุณภาพข้อมูล</label>
+                                    <select class="form-select" id="sourceQualityLevel">
+                                        <option value="basic">พื้นฐาน - รวดเร็ว แต่คุณภาพต่ำกว่า</option>
+                                        <option value="standard" selected>มาตรฐาน - สมดุลระหว่างความเร็วและคุณภาพ</option>
+                                        <option value="premium">พรีเมียม - คุณภาพสูงสุด แต่ใช้เวลามากกว่า</option>
+                                    </select>
+                                </div>
+
+                                <button type="button" class="btn btn-primary" id="generateFromSourceBtn">
+                                    <i class="fas fa-magic me-2"></i>
+                                    สร้างข้อมูลจากไฟล์ต้นฉบับ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    ผลการสร้างจากไฟล์ต้นฉบับ
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-4">
+                                    <div class="quality-score" id="sourceQualityScore">-</div>
+                                    <div class="text-muted">คะแนนคุณภาพโดยรวม</div>
+                                </div>
+                                
+                                <div class="loading text-center" id="sourceLoading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">กำลังสร้าง...</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="result-card" id="sourceResultCard">
+                                    <div class="d-grid gap-2">
+                                        <a href="#" class="btn btn-success" id="downloadSourceBtn" target="_blank">
+                                            <i class="fas fa-download me-2"></i>
+                                            ดาวน์โหลดชุดข้อมูล
+                                        </a>
+                                        <a href="#" class="btn btn-info" id="downloadSourceReportBtn" target="_blank">
+                                            <i class="fas fa-file-alt me-2"></i>
+                                            ดาวน์โหลดรายงาน
+                                        </a>
+                                        <button class="btn btn-primary" id="previewSourceBtn">
+                                            <i class="fas fa-eye me-2"></i>
+                                            แสดงตัวอย่างรายงาน
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ปรับปรุงชุดข้อมูล -->
+            <div class="tab-pane fade" id="enhance" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-wand-magic-sparkles me-2"></i>
+                                    ปรับปรุงชุดข้อมูล
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="enhanceForm">
+                                    <div class="mb-3">
+                                        <label for="enhanceDataset" class="form-label">เลือกชุดข้อมูล</label>
+                                        <select class="form-select" id="enhanceDataset" required>
+                                            <option value="">-- เลือกชุดข้อมูล --</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="enhanceTaskType" class="form-label">ประเภทงาน NLP</label>
+                                        <select class="form-select" id="enhanceTaskType">
+                                            <option value="">-- เลือกประเภทงาน --</option>
+                                            <option value="text_classification">Text Classification</option>
+                                            <option value="token_classification">Token Classification</option>
+                                            <option value="question_answering">Question Answering</option>
+                                            <option value="translation">Translation</option>
+                                            <option value="summarization">Summarization</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-magic me-2"></i>
+                                        ปรับปรุงชุดข้อมูล
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-chart-line me-2"></i>
+                                    ผลการปรับปรุง
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-4">
+                                    <div class="quality-score" id="enhanceQualityScore">-</div>
+                                    <div class="text-muted">คะแนนคุณภาพโดยรวม</div>
+                                </div>
+                                
+                                <div class="loading text-center" id="enhanceLoading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">กำลังปรับปรุง...</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="result-card" id="enhanceResultCard">
+                                    <div class="d-grid gap-2">
+                                        <a href="#" class="btn btn-success" id="downloadEnhancedBtn" target="_blank">
+                                            <i class="fas fa-download me-2"></i>
+                                            ดาวน์โหลดชุดข้อมูลที่ปรับปรุงแล้ว
+                                        </a>
+                                        <a href="#" class="btn btn-info" id="downloadEnhancedReportBtn" target="_blank">
+                                            <i class="fas fa-file-alt me-2"></i>
+                                            ดาวน์โหลดรายงาน
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- เพิ่มปุ่มบันทึกในส่วนที่แสดงผลลัพธ์ -->
+    <div id="results-section" class="mt-4" style="display: none;">
+        <h3>ผลลัพธ์</h3>
+        <div class="card">
+            <div class="card-body">
+                <p id="results-message"></p>
+                <p>คะแนนคุณภาพ: <span id="quality-score"></span></p>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="downloadResults()">ดาวน์โหลดผลการตรวจสอบ</button>
+                    <button class="btn btn-success" onclick="showSaveModal()">บันทึกชุดข้อมูล</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal สำหรับบันทึกชุดข้อมูล -->
+    <div class="modal fade" id="saveDatasetModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">บันทึกชุดข้อมูล</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="saveDatasetForm">
+                        <div class="mb-3">
+                            <label for="outputFilename" class="form-label">ชื่อไฟล์</label>
+                            <input type="text" class="form-control" id="outputFilename" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="outputFormat" class="form-label">รูปแบบไฟล์</label>
+                            <select class="form-select" id="outputFormat" required>
+                                <option value="json">JSON</option>
+                                <option value="csv">CSV</option>
+                                <option value="parquet">Parquet</option>
+                                <option value="arrow">Arrow</option>
+                                <option value="txt">Text</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="button" class="btn btn-primary" onclick="saveDataset()">บันทึก</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentDatasetPath = null;
+        let currentGeneratedPath = null;
+        let selectedFiles = new Set();
+        
+        // Drag and drop handling
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const uploadButton = document.getElementById('uploadButton');
+        const fileCountSpan = document.getElementById('fileCount');
+        
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        function handleFiles(files) {
+            for (const file of files) {
+                if (file.name.endsWith('.json')) {
+                    selectedFiles.add(file);
+                }
+            }
+            updateFileList();
+        }
+        
+        function updateFileList() {
+            fileList.innerHTML = '';
+            selectedFiles.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <i class="fas fa-file-code"></i>
+                    <span class="file-name">${file.name}</span>
+                    <i class="fas fa-times remove-file"></i>
+                `;
+                
+                fileItem.querySelector('.remove-file').addEventListener('click', () => {
+                    selectedFiles.delete(file);
+                    updateFileList();
+                });
+                
+                fileList.appendChild(fileItem);
+            });
+            
+            fileCountSpan.textContent = selectedFiles.size;
+            uploadButton.disabled = selectedFiles.size === 0;
+        }
+        
+        // Upload handling
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (selectedFiles.size === 0) {
+                alert('กรุณาเลือกไฟล์');
+                return;
+            }
+            
+            const progress = document.querySelector('.progress');
+            const progressBar = progress.querySelector('.progress-bar');
+            progress.style.display = 'flex';
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (const file of selectedFiles) {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        successCount++;
+                        currentDatasetPath = data.results_path;
+                        document.getElementById('qualityScore').textContent = 
+                            (data.quality_score * 100).toFixed(1) + '%';
+                        document.getElementById('resultCard').style.display = 'block';
+                        document.getElementById('downloadBtn').href = 
+                            `/results/${data.results_path.split('/').pop()}`;
+                    } else {
+                        failCount++;
+                        console.error(`Error uploading ${file.name}:`, data.error);
+                    }
+                } catch (error) {
+                    failCount++;
+                    console.error(`Error uploading ${file.name}:`, error);
+                }
+                
+                const progress = ((successCount + failCount) / selectedFiles.size) * 100;
+                progressBar.style.width = `${progress}%`;
+            }
+            
+            progress.style.display = 'none';
+            progressBar.style.width = '0%';
+            
+            if (failCount > 0) {
+                alert(`อัพโหลดเสร็จสิ้น\nสำเร็จ: ${successCount} ไฟล์\nไม่สำเร็จ: ${failCount} ไฟล์`);
+            } else {
+                alert('อัพโหลดเสร็จสิ้น');
+            }
+            
+            // Clear file list after upload
+            selectedFiles.clear();
+            updateFileList();
+        });
+        
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            if (!currentDatasetPath) return;
+            
+            document.querySelector('.loading').style.display = 'block';
+            
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ dataset_path: currentDatasetPath })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('การวิเคราะห์เสร็จสิ้น');
+                } else {
+                    alert(data.error || 'เกิดข้อผิดพลาดในการวิเคราะห์');
+                }
+            } catch (error) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+            } finally {
+                document.querySelector('.loading').style.display = 'none';
+            }
+        });
+        
+        document.getElementById('fixBtn').addEventListener('click', async () => {
+            if (!currentDatasetPath) return;
+            
+            if (!confirm('คุณต้องการแก้ไขชุดข้อมูลอัตโนมัติใช่หรือไม่?')) {
+                return;
+            }
+            
+            document.querySelector('.loading').style.display = 'block';
+            
+            try {
+                const response = await fetch('/fix', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ dataset_path: currentDatasetPath })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert(`การแก้ไขเสร็จสิ้น\nจำนวนที่แก้ไข: ${data.results.fixed_samples}\nจำนวนที่ข้าม: ${data.results.skipped_samples}`);
+                } else {
+                    alert(data.error || 'เกิดข้อผิดพลาดในการแก้ไข');
+                }
+            } catch (error) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+            } finally {
+                document.querySelector('.loading').style.display = 'none';
+            }
+        });
+
+        // สร้างชุดข้อมูล
+        document.getElementById('generateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const prompt = document.getElementById('prompt').value;
+            const numSamples = document.getElementById('numSamples').value;
+            const taskType = document.getElementById('taskType').value;
+            const outputFormat = document.getElementById('datasetOutputFormat').value;
+            const reportFormat = document.getElementById('reportFormat').value;
+            
+            if (!prompt) {
+                alert('กรุณาระบุ prompt');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('generateLoading').style.display = 'block';
+            document.getElementById('generateResultCard').style.display = 'none';
+            
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        num_samples: numSamples,
+                        task_type: taskType,
+                        output_format: outputFormat,
+                        report_format: reportFormat
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentGeneratedPath = data.dataset_path;
+                    document.getElementById('generateQualityScore').textContent = 
+                        (data.quality_score * 100).toFixed(1) + '%';
+                    document.getElementById('generateResultCard').style.display = 'block';
+                    document.getElementById('downloadGeneratedBtn').href = 
+                        `/results/${data.dataset_path.split('/').pop()}`;
+                    document.getElementById('downloadGeneratedReportBtn').href = 
+                        `/results/${data.results_path.split('/').pop()}`;
+                } else {
+                    alert(data.error || 'เกิดข้อผิดพลาดในการสร้างชุดข้อมูล');
+                }
+            } catch (error) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+            } finally {
+                document.getElementById('generateLoading').style.display = 'none';
+            }
+        });
+
+        // เพิ่มฟังก์ชันสำหรับปรับปรุง prompt
+        document.getElementById('enhancePromptBtn').addEventListener('click', async () => {
+            const prompt = document.getElementById('prompt').value;
+            const taskType = document.getElementById('task-type').value;
+            
+            if (!prompt) {
+                alert('กรุณากรอกคำอธิบายชุดข้อมูลก่อน');
+                return;
+            }
+            
+            const suggestionsDiv = document.getElementById('promptSuggestions');
+            const suggestionsList = document.getElementById('suggestionsList');
+            const featuresList = document.getElementById('featuresList');
+            
+            // แสดง loading
+            suggestionsDiv.style.display = 'block';
+            suggestionsList.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm"></div></div>';
+            
+            try {
+                const response = await fetch('/enhance-prompt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        task_type: taskType
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // แสดงคำแนะนำ
+                    suggestionsList.innerHTML = '';
+                    data.suggestions.forEach((suggestion, index) => {
+                        const div = document.createElement('div');
+                        div.className = 'prompt-suggestion';
+                        div.innerHTML = suggestion;
+                        div.addEventListener('click', () => {
+                            document.getElementById('prompt').value = suggestion;
+                            document.querySelectorAll('.prompt-suggestion').forEach(el => {
+                                el.classList.remove('selected');
+                            });
+                            div.classList.add('selected');
+                        });
+                        suggestionsList.appendChild(div);
+                    });
+                    
+                    // แสดงคุณลักษณะที่ครอบคลุม
+                    featuresList.innerHTML = '';
+                    data.features.forEach(feature => {
+                        const span = document.createElement('span');
+                        span.className = 'feature-tag';
+                        span.innerHTML = feature;
+                        featuresList.appendChild(span);
+                    });
+                    
+                    document.getElementById('promptFeatures').style.display = 'block';
+                } else {
+                    suggestionsList.innerHTML = `<div class="alert alert-danger">${data.error || 'เกิดข้อผิดพลาดในการปรับปรุงคำอธิบาย'}</div>`;
+                }
+            } catch (error) {
+                suggestionsList.innerHTML = '<div class="alert alert-danger">เกิดข้อผิดพลาดในการเชื่อมต่อ</div>';
+            }
+        });
+
+        document.getElementById('closeSuggestions').addEventListener('click', () => {
+            document.getElementById('promptSuggestions').style.display = 'none';
+        });
+
+        // Model Configuration Handling
+        document.getElementById('modelType').addEventListener('change', function() {
+            document.querySelectorAll('.model-settings').forEach(el => el.style.display = 'none');
+            const selectedType = this.value;
+            document.getElementById(`${selectedType}Settings`).style.display = 'block';
+        });
+
+        document.getElementById('modelConfigForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const modelType = document.getElementById('modelType').value;
+            let config = {
+                model_type: modelType
+            };
+            
+            switch (modelType) {
+                case 'mistral':
+                    config.api_key = document.getElementById('mistralApiKey').value;
+                    break;
+                case 'local':
+                    config.model_path = document.getElementById('localModelPath').value;
+                    break;
+                case 'ollama':
+                    config.endpoint = document.getElementById('ollamaEndpoint').value;
+                    config.model_name = document.getElementById('ollamaModel').value;
+                    break;
+                case 'huggingface':
+                    config.model_id = document.getElementById('hfModelId').value;
+                    break;
+            }
+            
+            try {
+                const response = await fetch('/update-model-config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('บันทึกการตั้งค่าสำเร็จ');
+                } else {
+                    alert(data.error || 'เกิดข้อผิดพลาดในการบันทึกการตั้งค่า');
+                }
+            } catch (error) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+            }
+        });
+
+        document.getElementById('downloadHfModel').addEventListener('click', async () => {
+            const modelId = document.getElementById('hfModelId').value;
+            if (!modelId) {
+                alert('กรุณาระบุ Model ID');
+                return;
+            }
+            
+            const progress = document.querySelector('#huggingfaceSettings .progress');
+            const progressBar = progress.querySelector('.progress-bar');
+            progress.style.display = 'flex';
+            
+            try {
+                const response = await fetch('/download-hf-model', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ model_id: modelId })
+                });
+                
+                // Set up SSE for progress updates
+                const eventSource = new EventSource(`/download-progress/${modelId}`);
+                
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.progress) {
+                        progressBar.style.width = `${data.progress}%`;
+                    }
+                    if (data.status === 'completed') {
+                        eventSource.close();
+                        progress.style.display = 'none';
+                        alert('ดาวน์โหลดและติดตั้ง Model สำเร็จ');
+                    }
+                };
+                
+                eventSource.onerror = () => {
+                    eventSource.close();
+                    progress.style.display = 'none';
+                    alert('เกิดข้อผิดพลาดในการดาวน์โหลด Model');
+                };
+            } catch (error) {
+                progress.style.display = 'none';
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+            }
+        });
+
+        // โหลดรายการชุดข้อมูลที่มีอยู่
+        async function loadDatasetList() {
+            try {
+                const response = await fetch('/list-datasets');
+                const data = await response.json();
+                
+                const select = document.getElementById('enhanceDataset');
+                select.innerHTML = '<option value="">-- เลือกชุดข้อมูล --</option>';
+                
+                data.datasets.forEach(dataset => {
+                    const option = document.createElement('option');
+                    option.value = dataset.path;
+                    option.textContent = dataset.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading dataset list:', error);
+            }
+        }
+
+        // เรียกใช้ฟังก์ชันโหลดรายการชุดข้อมูลเมื่อโหลดหน้า
+        document.addEventListener('DOMContentLoaded', loadDatasetList);
+
+        // จัดการการส่งฟอร์มปรับปรุงชุดข้อมูล
+        document.getElementById('enhanceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const datasetPath = document.getElementById('enhanceDataset').value;
+            const taskType = document.getElementById('enhanceTaskType').value;
+            
+            if (!datasetPath) {
+                alert('กรุณาเลือกชุดข้อมูล');
+                return;
+            }
+            
+            // แสดง loading
+            document.getElementById('enhanceLoading').style.display = 'block';
+            document.getElementById('enhanceResultCard').style.display = 'none';
+            
+            try {
+                const response = await fetch('/enhance-dataset', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        dataset_path: datasetPath,
+                        task_type: taskType
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('enhanceQualityScore').textContent = 
+                        (data.quality_score * 100).toFixed(1) + '%';
+                    document.getElementById('enhanceResultCard').style.display = 'block';
+                    document.getElementById('downloadEnhancedBtn').href = 
+                        `/results/${data.enhanced_dataset_path.split('/').pop()}`;
+                    document.getElementById('downloadEnhancedReportBtn').href = 
+                        `/results/${data.results_path.split('/').pop()}`;
+                } else {
+                    alert(data.error || 'เกิดข้อผิดพลาดในการปรับปรุงชุดข้อมูล');
+                }
+            } catch (error) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+            } finally {
+                document.getElementById('enhanceLoading').style.display = 'none';
+            }
+        });
+
+        function showSaveModal() {
+            // เก็บพาธของชุดข้อมูลปัจจุบัน
+            currentDatasetPath = document.getElementById('dataset-path').value;
+            
+            // แสดง Modal
+            const saveModal = new bootstrap.Modal(document.getElementById('saveDatasetModal'));
+            saveModal.show();
+        }
+
+        function saveDataset() {
+            const filename = document.getElementById('outputFilename').value;
+            const format = document.getElementById('outputFormat').value;
+            
+            if (!filename) {
+                alert('กรุณาระบุชื่อไฟล์');
+                return;
+            }
+            
+            // ส่งคำขอบันทึกชุดข้อมูล
+            fetch('/save-dataset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    dataset_path: currentDatasetPath,
+                    output_filename: filename,
+                    output_format: format
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('เกิดข้อผิดพลาด: ' + data.error);
+                } else {
+                    alert('บันทึกชุดข้อมูลสำเร็จ');
+                    // ปิด Modal
+                    const saveModal = bootstrap.Modal.getInstance(document.getElementById('saveDatasetModal'));
+                    saveModal.hide();
+                    
+                    // อัพเดทรายการไฟล์ (ถ้ามี)
+                    updateFileList();
+                }
+            })
+            .catch(error => {
+                alert('เกิดข้อผิดพลาดในการบันทึกชุดข้อมูล: ' + error);
+            });
+        }
+
+        // ฟังก์ชันอัพเดทรายการไฟล์ (ถ้าต้องการ)
+        function updateFileList() {
+            // เพิ่มโค้ดอัพเดทรายการไฟล์ตามต้องการ
+        }
+
+        // เพิ่มฟังก์ชันดาวน์โหลดผลการตรวจสอบ
+        function downloadResults() {
+            const resultsPath = document.getElementById('results-path').value;
+            if (resultsPath) {
+                window.location.href = '/results/' + encodeURIComponent(resultsPath);
+            }
+        }
+
+        // จัดการตัวอย่างรายงาน
+        document.getElementById('previewBtn').addEventListener('click', function() {
+            const downloadPath = document.getElementById('downloadBtn').getAttribute('href');
+            if (downloadPath) {
+                const reportPath = '/preview-report' + downloadPath.replace('/results', '');
+                window.open(reportPath, '_blank', 'width=800,height=600');
+            } else {
+                alert('ไม่พบรายงานสำหรับแสดงตัวอย่าง');
+            }
+        });
+        
+        document.getElementById('previewGeneratedBtn').addEventListener('click', function() {
+            const downloadPath = document.getElementById('downloadGeneratedReportBtn').getAttribute('href');
+            if (downloadPath) {
+                const reportPath = '/preview-report' + downloadPath.replace('/results', '');
+                window.open(reportPath, '_blank', 'width=800,height=600');
+            } else {
+                alert('ไม่พบรายงานสำหรับแสดงตัวอย่าง');
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // จัดการ Drop Zone
+            const sourceDropZone = document.getElementById('sourceDropZone');
+            const sourceFileInput = document.getElementById('sourceFileInput');
+            const sourceFileList = document.getElementById('sourceFileList');
+            const generateFromSourceBtn = document.getElementById('generateFromSourceBtn');
+            
+            // อาร์เรย์เก็บไฟล์ที่อัปโหลด
+            let uploadedSourceFiles = [];
+            
+            // เมื่อคลิกที่ drop zone
+            sourceDropZone.addEventListener('click', function() {
+                sourceFileInput.click();
+            });
+            
+            // เมื่อมีการเลือกไฟล์
+            sourceFileInput.addEventListener('change', function() {
+                handleSourceFiles(this.files);
+            });
+            
+            // เมื่อลากไฟล์มาที่ drop zone
+            sourceDropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('active');
+            });
+            
+            sourceDropZone.addEventListener('dragleave', function() {
+                this.classList.remove('active');
+            });
+            
+            sourceDropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('active');
+                handleSourceFiles(e.dataTransfer.files);
+            });
+            
+            // ฟังก์ชันจัดการไฟล์ที่อัปโหลด
+            function handleSourceFiles(files) {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    uploadedSourceFiles.push(file);
+                    
+                    // สร้าง UI แสดงไฟล์
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                        <div class="file-name">${file.name} (${formatFileSize(file.size)})</div>
+                        <div class="file-remove" data-index="${uploadedSourceFiles.length - 1}">
+                            <i class="fas fa-times"></i>
+                        </div>
+                    `;
+                    sourceFileList.appendChild(fileItem);
+                }
+                
+                // เปิดปุ่มสร้างข้อมูลถ้ามีไฟล์อัปโหลด
+                if (uploadedSourceFiles.length > 0) {
+                    generateFromSourceBtn.disabled = false;
+                }
+                
+                // จัดการการลบไฟล์
+                document.querySelectorAll('.file-remove').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        uploadedSourceFiles.splice(index, 1);
+                        this.closest('.file-item').remove();
+                        
+                        // ปรับปรุง data-index ของปุ่มลบทั้งหมด
+                        document.querySelectorAll('.file-remove').forEach((btn, i) => {
+                            btn.setAttribute('data-index', i);
+                        });
+                        
+                        // ปิดปุ่มสร้างข้อมูลถ้าไม่มีไฟล์
+                        if (uploadedSourceFiles.length === 0) {
+                            generateFromSourceBtn.disabled = true;
+                        }
+                    });
+                });
+            }
+            
+            // ฟังก์ชันแปลงขนาดไฟล์เป็นรูปแบบที่อ่านง่าย
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
+                else return (bytes / 1048576).toFixed(2) + ' MB';
+            }
+            
+            // จัดการการสร้างข้อมูลจากไฟล์ต้นฉบับ
+            generateFromSourceBtn.addEventListener('click', function() {
+                if (uploadedSourceFiles.length === 0) {
+                    alert('กรุณาอัปโหลดไฟล์อย่างน้อย 1 ไฟล์');
+                    return;
+                }
+                
+                // สร้าง FormData
+                const formData = new FormData();
+                
+                // เพิ่มไฟล์ทั้งหมด
+                uploadedSourceFiles.forEach((file, index) => {
+                    formData.append(`file_${index}`, file);
+                });
+                
+                // เพิ่มข้อมูลอื่นๆ
+                formData.append('task_type', document.getElementById('sourceTaskType').value);
+                formData.append('prompt', document.getElementById('sourcePrompt').value);
+                formData.append('output_format', document.getElementById('sourceOutputFormat').value);
+                formData.append('strict_factual', document.getElementById('sourceStrictFactual').checked);
+                formData.append('quality_level', document.getElementById('sourceQualityLevel').value);
+                
+                // แสดง loading
+                const loadingElement = document.createElement('div');
+                loadingElement.className = 'source-result-loading';
+                loadingElement.innerHTML = `
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">กำลังประมวลผล...</span>
+                    </div>
+                    <p class="mt-2">กำลังสร้างข้อมูลจากไฟล์ต้นฉบับ กรุณารอสักครู่...</p>
+                `;
+                sourceFileList.insertAdjacentElement('afterend', loadingElement);
+                loadingElement.style.display = 'block';
+                
+                // ปิดปุ่มสร้างข้อมูล
+                generateFromSourceBtn.disabled = true;
+                
+                // ส่งข้อมูลไปยังเซิร์ฟเวอร์
+                fetch('/generate-from-source', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // ลบ loading
+                    loadingElement.remove();
+                    
+                    // เปิดปุ่มสร้างข้อมูล
+                    generateFromSourceBtn.disabled = false;
+                    
+                    if (data.error) {
+                        alert('เกิดข้อผิดพลาด: ' + data.error);
+                    } else {
+                        // แสดงผลลัพธ์
+                        showAlert('สร้างข้อมูลสำเร็จ!', 'success');
+                        
+                        // สร้าง UI แสดงผลลัพธ์
+                        const resultElement = document.createElement('div');
+                        resultElement.className = 'alert alert-success';
+                        resultElement.innerHTML = `
+                            <h5>สร้างข้อมูลสำเร็จ!</h5>
+                            <p>คะแนนคุณภาพ: <strong>${data.quality_score}</strong></p>
+                            <div class="d-grid gap-2">
+                                <a href="${data.dataset_url}" class="btn btn-success" target="_blank">
+                                    <i class="fas fa-download me-2"></i>
+                                    ดาวน์โหลดชุดข้อมูล
+                                </a>
+                                <a href="${data.report_url}" class="btn btn-info" target="_blank">
+                                    <i class="fas fa-file-alt me-2"></i>
+                                    ดาวน์โหลดรายงาน
+                                </a>
+                                <button class="btn btn-primary preview-source-btn" data-report-url="${data.report_url}">
+                                    <i class="fas fa-eye me-2"></i>
+                                    แสดงตัวอย่างรายงาน
+                                </button>
+                            </div>
+                        `;
+                        sourceFileList.insertAdjacentElement('afterend', resultElement);
+                        
+                        // จัดการการแสดงตัวอย่างรายงาน
+                        resultElement.querySelector('.preview-source-btn').addEventListener('click', function() {
+                            const reportPath = '/preview-report' + this.getAttribute('data-report-url').replace('/download', '');
+                            window.open(reportPath, '_blank', 'width=800,height=600');
+                        });
+                    }
+                })
+                .catch(error => {
+                    // ลบ loading
+                    loadingElement.remove();
+                    
+                    // เปิดปุ่มสร้างข้อมูล
+                    generateFromSourceBtn.disabled = false;
+                    
+                    alert('เกิดข้อผิดพลาด: ' + error);
+                });
+            });
+        });
+    </script>
+</body>
+</html> 
